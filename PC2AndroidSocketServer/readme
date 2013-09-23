@@ -1,0 +1,46 @@
+使用说明:
+1、在PC上安装Android驱动和ADB
+2、 
+
+
+共四个功能：
+1、通过socket建立server端，监听来自PC端的连接；
+2、获取手机基本信息；
+3、获取软件列表。
+4、调用扫描、清理病毒接口（第三方开发的，只是调用下，并把返回的数据，socket传递给pc端）。
+
+详细说明如下：
+基本信息包括：
+当前连接设备的型号
+系统版本信息
+屏幕分辨率
+运行内存大小
+处理器信息
+硬件设备串号（IMEI）
+手机卡串号（IMSI）
+手机内存（机身ROM存储）
+标准SD卡信息（总大小、已用、可用）
+当前运行程序的个数
+当前可清理的应用缓存
+
+软件信息包括：
+软件名称
+软件包名
+软件大小
+软件版本
+软件图标
+
+扫描报告信息：（等待提供接口）
+
+所有信息均用json序列化传送。
+
+
+Install Android usb driver and ADB on your PC.
+
+Connect PC and Android device using USB cable.
+
+Set adb port forwarding. Example:> on pc's command console (shell prompt) $ adb forward tcp:9500 tcp:9500
+
+Run "PC2UsbSocketApplication" application on android device first.
+
+Compile and Run socket server in "SocketExample"
