@@ -2,6 +2,7 @@ package com.example.socket;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
@@ -14,113 +15,118 @@ import java.net.SocketAddress;
 import java.net.SocketException;
 import java.util.Enumeration;
 
-import android.os.Environment;
-import android.os.Handler;
-import android.os.Message;
 import android.util.Log;
 
 class SocketServer extends Thread {
 	private static final boolean DEBUG = AppEnv.DEBUG;
 	private static final String TAG = SocketServer.class.getSimpleName();
 
-	public static final int MSG_FROM_CLIENT = 1;
-	public static final int MSG_TO_CLIENT = 2;
 	private static final int SERVER_PORT = 9500;
+	public static final int EXIT = -1;
+	public static final int GET_PHONE_INFO = 1;
+	public static final int GET_APP_INFO = 2;
+	public static final int GET_APP_CACHE = 3;
+	public static final int SCAN_APP = 4;
+	public static final int GET_VIRUS_INFO = 5;
+	public static final int CLEAN_VIRUS = 6;
+	public static final int SCAN_APP_CACHE = 7;
+	public static final int CLEAN_APP_CACHE = 8;
 
-	private ServerSocket mSocketServer = null;
-	private Socket client;
-	private BufferedWriter mServerWriter = null;
-	private BufferedReader mReaderFromClient = null;
+	private ServerSocket mSocketServer;
 	private boolean doRun = true;
-
-	public Handler mMessageHandler = new Handler() {
-		public void handleMessage(Message msg) {
-			switch (msg.what) {
-			case MSG_TO_CLIENT:
-				try {
-					mServerWriter.write(msg.obj + "\n");
-					mServerWriter.flush();
-				} catch (Exception e) {
-					e.printStackTrace();
-				}
-				break;
-
-			default:
-				break;
-			}
-		};
-	};
 
 	@Override
 	public void run() {
 
 		try {
 			mSocketServer = new ServerSocket(SERVER_PORT);
-			client = mSocketServer.accept();
-			if (client == null) {
-				if (DEBUG)
-					Log.d(TAG, "no client connect");
-				return;
-			} else {
-				if (DEBUG)
-					Log.d(TAG, "has client connect : " + getClientInfo());
-			}
-
-			if (mCallback != null) {
-				mCallback.onClientConnect(getClientInfo());
-			}
-
-			InputStream is = client.getInputStream();
-			OutputStream os = client.getOutputStream();
-
-			mReaderFromClient = new BufferedReader(new InputStreamReader(is));
-			mServerWriter = new BufferedWriter(new OutputStreamWriter(os));
 		} catch (Exception e) {
 			if (DEBUG)
 				e.printStackTrace();
 			return;
 		}
+
 		if (DEBUG)
 			Log.d(TAG, "server start...");
+		while (doRun) {
+			try {
+				Socket socket = mSocketServer.accept();
+				dealSocket(socket);
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+		if (DEBUG)
+			Log.d(TAG, "server close");
+	}
+
+	private void dealSocket(Socket socket) {
+		if (socket == null) {
+			return;
+		}
+		if (DEBUG)
+			Log.d(TAG, "has client connect : " + getClientInfo());
+		setClientInfo(socket);
+		if (mCallback != null) {
+			mCallback.onClientConnect(getClientInfo());
+		}
+		BufferedWriter bufWriter = null;
+		BufferedReader bufReader = null;
+		try {
+			InputStream is = socket.getInputStream();
+			OutputStream os = socket.getOutputStream();
+			bufReader = new BufferedReader(new InputStreamReader(is));
+			bufWriter = new BufferedWriter(new OutputStreamWriter(os));
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 
 		try {
-			while (doRun) {
+			while (true) {
 				String msg = "";
-				msg = mReaderFromClient.readLine();
+				msg = bufReader.readLine();
 				if (DEBUG)
-					Log.d(TAG, msg);
-				if (msg.equals("exit")) {
+					Log.d(TAG, "dealSocket:" + msg);
+				int command = Integer.valueOf(msg);
+				switch (command) {
+				case EXIT:
 					close();
 					break;
-				} else if (msg != null && msg != "") {
+				case GET_PHONE_INFO:
+					writePhoneInfo(bufWriter);
+					break;
+
+				default:
+					break;
+				}
+				if (!doRun) {
+					break;
 				}
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
+		} finally {
+			if (bufWriter != null) {
+				try {
+					bufWriter.close();
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+			}
+			if (bufReader != null) {
+				try {
+					bufReader.close();
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+			}
 		}
-		close();
-		if (DEBUG)
-			Log.d(TAG, "server close");
 	}
 
 	public void close() {
 		if (DEBUG)
 			Log.d(TAG, "close");
 		doRun = false;
-		if (mServerWriter != null) {
-			try {
-				mServerWriter.close();
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
-		}
-		if (mReaderFromClient != null) {
-			try {
-				mReaderFromClient.close();
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
-		}
 		if (mSocketServer != null) {
 			try {
 				mSocketServer.close();
@@ -155,13 +161,18 @@ class SocketServer extends Thread {
 		return address;
 	}
 
+	private String clietInfo;
+
 	public String getClientInfo() {
-		if (client == null) {
-			return "";
+		return clietInfo;
+	}
+
+	public void setClientInfo(Socket socket) {
+		if (socket == null) {
+			return;
 		}
-		SocketAddress socketAddress = client.getRemoteSocketAddress();
-		String s = socketAddress.toString();
-		return s;
+		SocketAddress socketAddress = socket.getRemoteSocketAddress();
+		clietInfo = socketAddress.toString();
 	}
 
 	private Callback mCallback;
@@ -172,5 +183,10 @@ class SocketServer extends Thread {
 
 	public static interface Callback {
 		void onClientConnect(String msg);
+	}
+
+	public void writePhoneInfo(BufferedWriter bufWriter) throws IOException {
+		bufWriter.write("getPhoneInfo");
+		bufWriter.flush();
 	}
 }
